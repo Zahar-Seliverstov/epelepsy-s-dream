@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Moving Boxes</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+        .controls button {
+            background-color: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .controls button:hover {
+            background-color: #444;
+        }
+        .info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button id="clearBoxes">Очистить кубики</button>
+        <button id="resetBoxes">Пересоздать кубики</button>
+    </div>
+    <div class="info" id="boxCount">Кубиков: 0</div>
+    <canvas id="canvas"></canvas>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const clearButton = document.getElementById('clearBoxes');
+            const resetButton = document.getElementById('resetBoxes');
+            const boxCountDisplay = document.getElementById('boxCount');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const MIN_BOX_SIZE = 2; 
+            const MAX_BOX_SIZE = 8;
+            const MAX_SPEED = 1;
+            const MIN_SPEED = 0.5;
+            const ATTRACT_SPEED = 0.1;
+            const ATTRACT_RADIUS = 400;
+            const REACH_DISTANCE = 5;
+            const SPAWN_INTERVAL = 0.01;
+            const DEFAULT_BOX_COUNT = 100000;
+
+            let boxes = [];
+            let mouseX = -1000;
+            let mouseY = -1000;
+            let attractMode = false;
+            let spawnIntervalId;
+
+            // Создаем новый кубик
+            function createBox(x = Math.random() * canvas.width, y = Math.random() * canvas.height) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * (MAX_SPEED - MIN_SPEED) + MIN_SPEED;
+                const size = Math.random() * (MAX_BOX_SIZE - MIN_BOX_SIZE) + MIN_BOX_SIZE;
+                return {
+                    x,
+                    y,
+                    size,
+                    color: `hsl(${Math.random() * 360}, 50%, 50%)`,
+                    speedX: Math.cos(angle) * speed,
+                    speedY: Math.sin(angle) * speed
+                };
+            }
+
+            // Обновляем отображение количества кубиков
+            function updateBoxCount() {
+                boxCountDisplay.textContent = `Кубиков: ${boxes.length}`;
+            }
+
+            // Инициализация начальных кубиков
+            function initializeBoxes(count = DEFAULT_BOX_COUNT) {
+                boxes = [];
+                for (let i = 0; i < count; i++) {
+                    boxes.push(createBox());
+                }
+                updateBoxCount();
+            }
+
+            initializeBoxes();
+
+            // Обработчик движения мыши
+            document.addEventListener('mousemove', (event) => {
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+
+            // Обработчик нажатия кнопок мыши
+            document.addEventListener('mousedown', (event) => {
+                if (event.button === 0) {
+                    spawnIntervalId = setInterval(() => {
+                        boxes.push(createBox(mouseX, mouseY));
+                        updateBoxCount();
+                    }, SPAWN_INTERVAL);
+                } else if (event.button === 2) {
+                    attractMode = true;
+                }
+            });
+
+            // Отключение режимов при отпускании кнопок мыши
+            document.addEventListener('mouseup', (event) => {
+                if (event.button === 0) {
+                    clearInterval(spawnIntervalId);
+                } else if (event.button === 2) {
+                    attractMode = false;
+                }
+            });
+
+            // Обработка кнопки очистки
+            clearButton.addEventListener('click', () => {
+                boxes = [];
+                updateBoxCount();
+            });
+
+            // Обработка кнопки пересоздания
+            resetButton.addEventListener('click', () => {
+                initializeBoxes();
+            });
+
+            // Отключаем контекстное меню для правой кнопки мыши
+            document.addEventListener('contextmenu', (event) => event.preventDefault());
+
+            function updateBoxes() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                boxes = boxes.filter((box) => {
+                    const dx = mouseX - box.x;
+                    const dy = mouseY - box.y;
+                    const distance = Math.hypot(dx, dy);
+
+                    if (attractMode && distance < ATTRACT_RADIUS) {
+                        box.x += dx * ATTRACT_SPEED;
+                        box.y += dy * ATTRACT_SPEED;
+
+                        if (distance < REACH_DISTANCE) {
+                            return false;
+                        }
+                    } else {
+                        box.x += box.speedX;
+                        box.y += box.speedY;
+
+                        if (box.x < 0 || box.x > canvas.width) {
+                            box.speedX *= -1;
+                        }
+                        if (box.y < 0 || box.y > canvas.height) {
+                            box.speedY *= -1;
+                        }
+                    }
+
+                    ctx.fillStyle = box.color;
+                    ctx.fillRect(box.x, box.y, box.size, box.size);
+
+                    return true;
+                });
+
+                updateBoxCount();
+                requestAnimationFrame(updateBoxes);
+            }
+
+            updateBoxes();
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        });
+    </script>
+</body>
+</html>
